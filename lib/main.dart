@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+const supabaseUrl = String.fromEnvironment('SUPABASE_URL',
+    defaultValue: 'https://vsgukztbxfpantickqic.supabase.co');
+const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY',
+    defaultValue:
+        'sb_publishable_pnvRgD0j6tJuNMWuFlpV2g_B1uxLWCn');
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://vsgukztbxfpantickqic.supabase.co',
-    anonKey:
-        'sb_publishable_pnvRgD0j6tJuNMWuFlpV2g_B1uxLWCn',
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
 
   runApp(const MyApp());

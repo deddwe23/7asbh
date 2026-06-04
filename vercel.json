@@ -1,0 +1,9 @@
+{
+  "outputDirectory": "build/web",
+  "buildCommand": "flutter build web --release",
+  "framework": "flutter",
+  "installCommand": "echo 'Flutter SDK required. Set up in Vercel project settings.'",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
