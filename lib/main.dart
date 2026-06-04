@@ -29,6 +29,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
+      title: 'رصيدي',
       home: AuthGate(),
     );
   }
@@ -366,7 +367,8 @@ class _WalletPageState extends State<WalletPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('عملية جديدة'),
+              title: const Text('عملية جديدة',
+                  textAlign: TextAlign.center),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -394,6 +396,7 @@ class _WalletPageState extends State<WalletPage> {
                   TextField(
                     controller: amountController,
                     keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
                     decoration: const InputDecoration(
                       labelText: 'المبلغ',
                       border: OutlineInputBorder(),
@@ -402,6 +405,7 @@ class _WalletPageState extends State<WalletPage> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: noteController,
+                    textAlign: TextAlign.center,
                     decoration: InputDecoration(
                       labelText: selectedType == 'سلفة'
                           ? 'اسم الشخص (اختياري)'
@@ -455,23 +459,24 @@ class _WalletPageState extends State<WalletPage> {
               children: [
                 balanceCard(),
                 statsRow(),
-                const Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      Text(
+                  const Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Center(
+                      child: Text(
                         'سجل العمليات',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold),
                       ),
-                    ],
+                    ),
                   ),
-                ),
                 Expanded(
                   child: records.isEmpty
-                      ? const Center(child: Text('لا توجد عمليات بعد'))
+                      ? const Center(
+                          child: Text('لا توجد عمليات بعد',
+                              textAlign: TextAlign.center))
                       : ListView.builder(
                           itemCount: records.length,
                           itemBuilder: (context, index) {
@@ -501,11 +506,13 @@ class _WalletPageState extends State<WalletPage> {
         children: [
           const Text(
             'الرصيد الحالي',
+            textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white70, fontSize: 16),
           ),
           const SizedBox(height: 8),
           Text(
             '${balance.toStringAsFixed(2)} ريال',
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 34,
@@ -549,12 +556,14 @@ class _WalletPageState extends State<WalletPage> {
           children: [
             Text(
               label,
+              textAlign: TextAlign.center,
               style:
                   TextStyle(color: color, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
               amount.toStringAsFixed(2),
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -626,21 +635,38 @@ class _WalletPageState extends State<WalletPage> {
           child: Icon(icon, color: iconColor, size: 20),
         ),
         title: Text(type,
+            textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: subtitle.isNotEmpty
             ? Text(subtitle,
+                textAlign: TextAlign.center,
                 style:
                     TextStyle(color: Colors.grey[600], fontSize: 13))
             : null,
-        trailing: Text(
-          '${amount.toStringAsFixed(2)} ريال',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: type == 'إيداع' || type == 'استرداد سلفة'
-                ? Colors.green
-                : Colors.red,
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${amount.toStringAsFixed(2)} ريال',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: type == 'إيداع' || type == 'استرداد سلفة'
+                    ? Colors.green
+                    : Colors.red,
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18),
+              color: Colors.red.shade300,
+              onPressed: () async {
+                final confirmed = await confirmDelete(item);
+                if (confirmed) deleteTransaction(item);
+              },
+            ),
+          ],
         ),
       ),
     );
