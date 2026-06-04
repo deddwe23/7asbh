@@ -102,11 +102,13 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<void> addTransaction(String type, double amount,
       {String? note}) async {
-    await supabase.from('transactions').insert({
+    final response = await supabase.from('transactions').insert({
       'type': type,
       'amount': amount,
       'note': note ?? '',
-    });
+    }).select();
+
+    final inserted = (response as List<dynamic>).first as Map<String, dynamic>;
 
     setState(() {
       if (type == 'إيداع') {
@@ -123,13 +125,58 @@ class _WalletPageState extends State<WalletPage> {
         totalLoans -= amount;
       }
 
-      records.insert(0, {
-        'type': type,
-        'amount': amount,
-        'note': note ?? '',
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      records.insert(0, inserted);
     });
+  }
+
+  Future<void> deleteTransaction(Map<String, dynamic> item) async {
+    final id = item['id'];
+    if (id == null) return;
+
+    await supabase.from('transactions').delete().eq('id', id);
+
+    setState(() {
+      final type = item['type'] as String;
+      final amount = (item['amount'] as num).toDouble();
+
+      if (type == 'إيداع') {
+        balance -= amount;
+        totalDeposits -= amount;
+      } else if (type == 'سحب') {
+        balance += amount;
+        totalWithdrawals -= amount;
+      } else if (type == 'سلفة') {
+        balance += amount;
+        totalLoans -= amount;
+      } else if (type == 'استرداد سلفة') {
+        balance -= amount;
+        totalLoans += amount;
+      }
+
+      records.removeWhere((r) => r['id'] == id);
+    });
+  }
+
+  Future<bool> confirmDelete(Map<String, dynamic> item) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد الحذف'),
+        content: Text('هل تريد حذف ${item['type']} بقيمة ${item['amount']} ريال؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حذف', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   void showTransactionDialog() {
@@ -376,24 +423,36 @@ class _WalletPageState extends State<WalletPage> {
       subtitle = '';
     }
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: iconColor.withValues(alpha: 0.15),
-        child: Icon(icon, color: iconColor, size: 20),
+    return Dismissible(
+      key: ValueKey(item['id'] ?? DateTime.now().millisecondsSinceEpoch),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: Colors.red,
+        child: const Icon(Icons.delete, color: Colors.white),
       ),
-      title: Text(type, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: subtitle.isNotEmpty
-          ? Text(subtitle,
-              style: TextStyle(color: Colors.grey[600], fontSize: 13))
-          : null,
-      trailing: Text(
-        '${amount.toStringAsFixed(2)} ريال',
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: type == 'إيداع' || type == 'استرداد سلفة'
-              ? Colors.green
-              : Colors.red,
+      confirmDismiss: (_) => confirmDelete(item),
+      onDismissed: (_) => deleteTransaction(item),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: iconColor.withValues(alpha: 0.15),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
+        title: Text(type, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: subtitle.isNotEmpty
+            ? Text(subtitle,
+                style: TextStyle(color: Colors.grey[600], fontSize: 13))
+            : null,
+        trailing: Text(
+          '${amount.toStringAsFixed(2)} ريال',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: type == 'إيداع' || type == 'استرداد سلفة'
+                ? Colors.green
+                : Colors.red,
+          ),
         ),
       ),
     );
