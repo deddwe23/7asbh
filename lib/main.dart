@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL',
@@ -28,7 +29,176 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: WalletPage(),
+      home: AuthGate(),
+    );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool? loggedIn;
+
+  @override
+  void initState() {
+    super.initState();
+    checkLogin();
+  }
+
+  Future<void> checkLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLoggedIn = prefs.getBool('logged_in') ?? false;
+    setState(() => loggedIn = isLoggedIn);
+  }
+
+  Future<void> login(String username, String password) async {
+    if (username == 'admin' && password == 'admin') {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('logged_in', true);
+      setState(() => loggedIn = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loggedIn == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (loggedIn == true) {
+      return const WalletPage();
+    }
+
+    return LoginPage(onLogin: login);
+  }
+}
+
+class LoginPage extends StatefulWidget {
+  final Future<void> Function(String, String) onLogin;
+  const LoginPage({super.key, required this.onLogin});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final usernameController = TextEditingController();
+  final passwordController = TextEditingController();
+  bool loading = false;
+  String? error;
+
+  @override
+  void dispose() {
+    usernameController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> handleLogin() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+
+    try {
+      await widget.onLogin(
+        usernameController.text,
+        passwordController.text,
+      );
+    } catch (_) {}
+
+    if (mounted && error == null) {
+      setState(() {
+        error = 'خطأ في اسم المستخدم أو كلمة السر';
+        loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.green.shade50,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.account_balance_wallet,
+                      size: 64, color: Colors.green.shade700),
+                  const SizedBox(height: 16),
+                  Text('رصيدي',
+                      style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade800)),
+                  const SizedBox(height: 32),
+                  TextField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'اسم المستخدم',
+                      prefixIcon: Icon(Icons.person),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'كلمة السر',
+                      prefixIcon: Icon(Icons.lock),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(error!,
+                          style: const TextStyle(color: Colors.red)),
+                    ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: loading ? null : handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: loading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('تسجيل الدخول',
+                              style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -108,7 +278,8 @@ class _WalletPageState extends State<WalletPage> {
       'note': note ?? '',
     }).select();
 
-    final inserted = (response as List<dynamic>).first as Map<String, dynamic>;
+    final inserted =
+        (response as List<dynamic>).first as Map<String, dynamic>;
 
     setState(() {
       if (type == 'إيداع') {
@@ -162,16 +333,19 @@ class _WalletPageState extends State<WalletPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تأكيد الحذف'),
-        content: Text('هل تريد حذف ${item['type']} بقيمة ${item['amount']} ريال؟'),
+        content: Text(
+            'هل تريد حذف ${item['type']} بقيمة ${item['amount']} ريال؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('إلغاء'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('حذف', style: TextStyle(color: Colors.white)),
+            child: const Text('حذف',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -181,8 +355,10 @@ class _WalletPageState extends State<WalletPage> {
 
   void showTransactionDialog() {
     String selectedType = 'إيداع';
-    final TextEditingController amountController = TextEditingController();
-    final TextEditingController noteController = TextEditingController();
+    final TextEditingController amountController =
+        TextEditingController();
+    final TextEditingController noteController =
+        TextEditingController();
 
     showDialog(
       context: context,
@@ -198,9 +374,12 @@ class _WalletPageState extends State<WalletPage> {
                     value: selectedType,
                     isExpanded: true,
                     items: const [
-                      DropdownMenuItem(value: 'إيداع', child: Text('إيداع')),
-                      DropdownMenuItem(value: 'سحب', child: Text('سحب')),
-                      DropdownMenuItem(value: 'سلفة', child: Text('سلفة')),
+                      DropdownMenuItem(
+                          value: 'إيداع', child: Text('إيداع')),
+                      DropdownMenuItem(
+                          value: 'سحب', child: Text('سحب')),
+                      DropdownMenuItem(
+                          value: 'سلفة', child: Text('سلفة')),
                       DropdownMenuItem(
                           value: 'استرداد سلفة',
                           child: Text('استرداد سلفة')),
@@ -277,13 +456,15 @@ class _WalletPageState extends State<WalletPage> {
                 balanceCard(),
                 statsRow(),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
                       Text(
                         'سجل العمليات',
                         style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -307,7 +488,8 @@ class _WalletPageState extends State<WalletPage> {
   Widget balanceCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      padding:
+          const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF43A047), Color(0xFF2E7D32)],
@@ -345,7 +527,8 @@ class _WalletPageState extends State<WalletPage> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: statCard('سحوبات', totalWithdrawals, Colors.red),
+            child:
+                statCard('سحوبات', totalWithdrawals, Colors.red),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -360,12 +543,14 @@ class _WalletPageState extends State<WalletPage> {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding:
+            const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         child: Column(
           children: [
             Text(
               label,
-              style: TextStyle(color: color, fontWeight: FontWeight.bold),
+              style:
+                  TextStyle(color: color, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
@@ -424,7 +609,8 @@ class _WalletPageState extends State<WalletPage> {
     }
 
     return Dismissible(
-      key: ValueKey(item['id'] ?? DateTime.now().millisecondsSinceEpoch),
+      key: ValueKey(
+          item['id'] ?? DateTime.now().millisecondsSinceEpoch),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -439,10 +625,12 @@ class _WalletPageState extends State<WalletPage> {
           backgroundColor: iconColor.withValues(alpha: 0.15),
           child: Icon(icon, color: iconColor, size: 20),
         ),
-        title: Text(type, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(type,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: subtitle.isNotEmpty
             ? Text(subtitle,
-                style: TextStyle(color: Colors.grey[600], fontSize: 13))
+                style:
+                    TextStyle(color: Colors.grey[600], fontSize: 13))
             : null,
         trailing: Text(
           '${amount.toStringAsFixed(2)} ريال',
